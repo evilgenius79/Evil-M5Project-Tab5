@@ -100,8 +100,111 @@ bool inMenu = true;
 const char* menuItems[] = {"Scan WiFi", "Select Network", "Clone & Details" , "Start Captive Portal", "Stop Captive Portal" , "Change Portal", "Check Credentials", "Delete All Credentials", "Monitor Status", "Probe Attack", "Probe Sniffing", "Karma Attack", "Karma Auto", "Karma Spear", "Select Probe", "Delete Probe", "Delete All Probes", "Brightness", "Wardriving", "Beacon Spam", "Deauth Detection", "Wall Of Flipper"};
 const int menuSize = sizeof(menuItems) / sizeof(menuItems[0]);
 
-const int maxMenuDisplay = 10;
+int maxMenuDisplay = 10; // number of visible menu rows (scaled up on Tab5 at boot)
 int menuStartIndex = 0;
+
+// ---------------------------------------------------------------------------
+// Tab5 UI scaling. The base UI was designed for a 320x240 panel; the Tab5 is a
+// 1280x720 IPS panel. These globals are computed once at boot (initUiScale())
+// from the real display size, so the same drawing code lays out proportionally
+// on the large panel while staying identical on smaller devices.
+int  uiTextSize   = 2;   // base text size for menu / body text
+int  uiSmallText  = 1;   // smaller text (labels, secondary lines)
+int  uiLineHeight = 22;  // menu row height in px
+int  uiListHeight = 18;  // list/detail row height in px
+int  uiLine       = 20;  // vertical advance for one text line in detail screens
+int  uiMargin     = 5;   // left margin in px
+int  uiNavY       = 220; // y of the bottom Up/Select/Down navigation bar
+int  uiGlyphW     = 6;   // pixel width of one size-1 glyph (font 1 == 6px)
+int  uiGlyphH     = 8;   // pixel height of one size-1 glyph (font 1 == 8px)
+bool uiIsLarge    = false;
+
+// Draw a 3-zone (or 2-zone) bottom navigation bar whose labels are centred in
+// the same width/3 (or width/2) touch zones the input code already uses.
+void drawNavBar3(const char* left, const char* mid, const char* right) {
+  int w = M5.Display.width();
+  int zone = w / 3;
+  int th = uiSmallText;
+  M5.Display.setTextSize(th);
+  M5.Display.setTextColor(TFT_DARKGRAY);
+  int gw = uiGlyphW * th;
+  auto centre = [&](const char* s, int zoneStart) {
+    int len = strlen(s);
+    int x = zoneStart + (zone - len * gw) / 2;
+    if (x < zoneStart + 2) x = zoneStart + 2;
+    M5.Display.setCursor(x, uiNavY);
+    M5.Display.print(s);
+  };
+  centre(left, 0);
+  centre(mid, zone);
+  centre(right, 2 * zone);
+  M5.Display.setTextSize(uiTextSize);
+  M5.Display.setTextColor(TFT_WHITE);
+}
+
+// Two-zone bottom bar, each label centred in its width/2 touch zone. Optional
+// colours let callers keep the classic green "Yes" / red "No" styling.
+void drawNavBar2Colored(const char* left, uint16_t lc, const char* right, uint16_t rc) {
+  int w = M5.Display.width();
+  int zone = w / 2;
+  int th = uiSmallText;
+  M5.Display.setTextSize(th);
+  int gw = uiGlyphW * th;
+  int lx = (zone - (int)strlen(left) * gw) / 2;   if (lx < 2) lx = 2;
+  int rx = zone + (zone - (int)strlen(right) * gw) / 2; if (rx < zone + 2) rx = zone + 2;
+  M5.Display.setTextColor(lc);
+  M5.Display.setCursor(lx, uiNavY); M5.Display.print(left);
+  M5.Display.setTextColor(rc);
+  M5.Display.setCursor(rx, uiNavY); M5.Display.print(right);
+  M5.Display.setTextSize(uiTextSize);
+  M5.Display.setTextColor(TFT_WHITE);
+}
+
+// Single label centred across the whole width, pinned to the bottom nav row.
+void drawNavCenter(const char* s) {
+  int th = uiSmallText;
+  M5.Display.setTextSize(th);
+  M5.Display.setTextColor(TFT_LIGHTGREY);
+  int gw = uiGlyphW * th;
+  int x = (M5.Display.width() - (int)strlen(s) * gw) / 2;
+  if (x < 2) x = 2;
+  M5.Display.setCursor(x, uiNavY);
+  M5.Display.print(s);
+  M5.Display.setTextSize(uiTextSize);
+  M5.Display.setTextColor(TFT_WHITE);
+}
+
+void initUiScale() {
+  int w = M5.Display.width();
+  int h = M5.Display.height();
+  uiGlyphW = 6;
+  uiGlyphH = 8;
+  if (w >= 700) {           // Tab5 / large landscape panels
+    uiIsLarge   = true;
+    uiTextSize  = 4;
+    uiSmallText = 3;
+    uiLineHeight = uiGlyphH * uiTextSize + 20;      // 52 px menu rows
+    uiListHeight = uiGlyphH * uiTextSize + 8;        // 40 px list rows (fits size-4 text)
+    uiLine      = uiGlyphH * uiTextSize + 6;         // 38 px detail line advance
+    uiMargin    = 24;
+    uiNavY      = h - (uiGlyphH * uiSmallText) - 14; // nav bar pinned to bottom
+    // Fill the panel: leave room for the bottom nav bar.
+    maxMenuDisplay = (uiNavY - 8) / uiLineHeight;
+    maxMenuDisplayKarma = (h - 30) / uiLineHeight;
+  } else {                  // original small-panel behaviour (unchanged)
+    uiIsLarge   = false;
+    uiTextSize  = 2;
+    uiSmallText = 1;
+    uiLineHeight = 22;
+    uiListHeight = 18;
+    uiLine      = 20;
+    uiMargin    = 5;
+    uiNavY      = 220;
+    maxMenuDisplay = 10;
+    maxMenuDisplayKarma = 9;
+  }
+}
+// ---------------------------------------------------------------------------
 
 String ssidList[100];
 int numSsid = 0;
@@ -152,7 +255,7 @@ bool isScanningKarma = false;
 int currentIndexKarma = -1;
 int menuStartIndexKarma = 0;
 int menuSizeKarma = 0;
-const int maxMenuDisplayKarma = 9;
+int maxMenuDisplayKarma = 9; // visible karma rows (scaled up on Tab5 at boot)
 
 enum AppState {
   StartScanKarma,
@@ -237,6 +340,7 @@ int maxChannelScanning = 13;
 void setup() {
   M5.begin();
   Serial.begin(115200);
+  initUiScale(); // compute Tab5 UI scaling from the real panel size
   int GPS_RX_PIN;
   int GPS_TX_PIN;
   switch (M5.getBoard()) {
@@ -269,7 +373,7 @@ void setup() {
   }
 
 
-  M5.Display.setTextSize(2);
+  M5.Display.setTextSize(uiTextSize);
   M5.Display.setTextColor(TFT_WHITE);
   M5.Display.setTextFont(1);
 
@@ -476,27 +580,37 @@ void setup() {
     delay(4000);
   }
 
-  int textY = 80;
+  M5.Display.clear();
+  M5.Display.setTextSize(uiTextSize);
+  M5.Display.setTextFont(1);
+
+  int cx = M5.Display.width() / 2;
+  int textY = uiIsLarge ? (M5.Display.height() / 2 - uiLine * 3) : 80;
   int lineOffset = 10;
   int lineY1 = textY - lineOffset;
-  int lineY2 = textY + lineOffset + 30;
+  int lineY2 = textY + uiLine * 2 + lineOffset + (uiIsLarge ? 6 : 20);
 
-  M5.Display.clear();
+  // Horizontal rules bracketing the title block.
   M5.Display.drawLine(0, lineY1, M5.Display.width(), lineY1, TFT_WHITE);
   M5.Display.drawLine(0, lineY2, M5.Display.width(), lineY2, TFT_WHITE);
 
-  M5.Display.setCursor(80, textY);
-  M5.Display.println(" Evil-Tab5");
+  // Centre each line horizontally on the panel.
+  auto centerLine = [&](const char* s, int y) {
+    int wpx = M5.Display.textWidth(s);
+    int x = cx - wpx / 2;
+    if (x < 0) x = 0;
+    M5.Display.setCursor(x, y);
+    M5.Display.println(s);
+  };
+
+  centerLine("Evil-Tab5", textY);
   Serial.println("-------------------");
   Serial.println(" Evil-Tab5");
-  M5.Display.setCursor(75, textY + 20);
-  M5.Display.println("By 7h30th3r0n3");
-  M5.Display.setCursor(102, textY + 45);
-  M5.Display.println("v1.0 2025");
+  centerLine("By 7h30th3r0n3", textY + uiLine);
+  centerLine("v1.0 2025", textY + uiLine * 2);
   Serial.println("By 7h30th3r0n3");
   Serial.println("-------------------");
-  M5.Display.setCursor(0 , textY + 120);
-  M5.Display.println(randomMessage);
+  centerLine(randomMessage, lineY2 + uiLine * 2);
   Serial.println(" ");
   Serial.println(randomMessage);
   Serial.println("-------------------");
@@ -779,12 +893,15 @@ void handleMenuInput() {
 
 void drawMenu() {
   M5.Display.clear();
-  M5.Display.setTextSize(2);
+  M5.Display.setTextSize(uiTextSize);
   M5.Display.setTextFont(1);
 
-  int lineHeight = 22;
-  int startX = 5;
+  int lineHeight = uiLineHeight;
+  int startX = uiMargin;
   int startY = 0;
+  int glyphH = uiGlyphH * uiTextSize;
+  int textOffset = (lineHeight - glyphH) / 2;
+  if (textOffset < 0) textOffset = 0;
 
   for (int i = 0; i < maxMenuDisplay; i++) {
     int menuIndex = menuStartIndex + i;
@@ -792,20 +909,29 @@ void drawMenu() {
 
     if (menuIndex == currentIndex) {
       M5.Display.fillRect(0, startY + i * lineHeight, M5.Display.width(), lineHeight, TFT_NAVY);
+      // Accent bar on the selected row (looks better on the large Tab5 panel).
+      if (uiIsLarge) M5.Display.fillRect(0, startY + i * lineHeight, 6, lineHeight, TFT_GREEN);
       M5.Display.setTextColor(TFT_GREEN);
     } else {
       M5.Display.setTextColor(TFT_WHITE);
     }
-    M5.Display.setCursor(startX, startY + i * lineHeight + (lineHeight / 2) - 8);
+    M5.Display.setCursor(startX, startY + i * lineHeight + textOffset);
     M5.Display.println(menuItems[menuIndex]);
   }
-  M5.Display.setTextColor(TFT_DARKGRAY); // thanks to kdv88 for this button
-  M5.Display.setCursor(58, 220);
-  M5.Display.println("Up");
-  M5.Display.setCursor(130, 220);
-  M5.Display.println("Select");
-  M5.Display.setCursor(233, 220);
-  M5.Display.println("Down");
+
+  // Scroll indicator on the right edge when the list is longer than the screen.
+  if (uiIsLarge && menuSize > maxMenuDisplay) {
+    int barX = M5.Display.width() - 8;
+    int trackH = uiNavY - 8;
+    int knobH = (trackH * maxMenuDisplay) / menuSize;
+    if (knobH < 12) knobH = 12;
+    int knobY = (trackH * menuStartIndex) / menuSize;
+    M5.Display.fillRect(barX, 0, 6, trackH, TFT_DARKGRAY);
+    M5.Display.fillRect(barX, knobY, 6, knobH, TFT_GREEN);
+  }
+
+  // Bottom navigation bar, centred inside the width/3 touch zones (thanks kdv88).
+  drawNavBar3("Up", "Select", "Down");
   M5.Display.display();
   M5.Display.setTextColor(TFT_WHITE);
 
@@ -1170,7 +1296,7 @@ void scanWifiNetworks() {
   int n;
   while (millis() - startTime < 5000) {
     M5.Display.clear();
-    M5.Display.fillRect(0, M5.Display.height() - 20, M5.Display.width(), 20, TFT_BLACK);
+    M5.Display.fillRect(0, M5.Display.height() - uiLine, M5.Display.width(), uiLine, TFT_BLACK);
     M5.Display.setCursor(50 , M5.Display.height() / 2 );
     M5.Display.print("Scan in progress... ");
     Serial.println("-------------------");
@@ -1196,20 +1322,20 @@ void scanWifiNetworks() {
 }
 
 void showWifiList() {
-  const int listDisplayLimit = M5.Display.height() / 18; // Nombre d'éléments affichés à la fois
+  const int listDisplayLimit = M5.Display.height() / uiListHeight; // Nombre d'éléments affichés à la fois
   int listStartIndex = max(0, min(currentListIndex, numSsid - listDisplayLimit));
   static bool isTouchHandled = false; // Pour s'assurer d'un seul changement par touché
 
   M5.Display.clear();
-  M5.Display.setTextSize(2);
+  M5.Display.setTextSize(uiTextSize);
   for (int i = listStartIndex; i < min(numSsid, listStartIndex + listDisplayLimit); i++) {
     if (i == currentListIndex) {
-      M5.Display.fillRect(0, (i - listStartIndex) * 18, M5.Display.width(), 18, TFT_NAVY);
+      M5.Display.fillRect(0, (i - listStartIndex) * uiListHeight, M5.Display.width(), uiListHeight, TFT_NAVY);
       M5.Display.setTextColor(TFT_GREEN);
     } else {
       M5.Display.setTextColor(TFT_WHITE);
     }
-    M5.Display.setCursor(10, (i - listStartIndex) * 18);
+    M5.Display.setCursor(10, (i - listStartIndex) * uiListHeight);
     M5.Display.println(ssidList[i]);
   }
   M5.Display.display();
@@ -1264,45 +1390,40 @@ void showWifiDetails(int &networkIndex) {
   auto updateDisplay = [&]() {
     if (networkIndex >= 0 && networkIndex < numSsid) {
       M5.Display.clear();
-      M5.Display.setTextSize(2);
+      M5.Display.setTextSize(uiTextSize);
       int y = 10;
 
       // SSID
       M5.Display.setCursor(10, y);
       M5.Display.println("SSID: " + (ssidList[networkIndex].length() > 0 ? ssidList[networkIndex] : "N/A"));
-      y += 40;
+      y += uiLine * 2;
 
       // Channel
       int channel = WiFi.channel(networkIndex);
       M5.Display.setCursor(10, y);
       M5.Display.println("Channel: " + (channel > 0 ? String(channel) : "N/A"));
-      y += 20;
+      y += uiLine;
 
       // Security
       String security = getWifiSecurity(networkIndex);
       M5.Display.setCursor(10, y);
       M5.Display.println("Security: " + (security.length() > 0 ? security : "N/A"));
-      y += 20;
+      y += uiLine;
 
       // Signal Strength
       int32_t rssi = WiFi.RSSI(networkIndex);
       M5.Display.setCursor(10, y);
       M5.Display.println("Signal: " + (rssi != 0 ? String(rssi) + " dBm" : "N/A"));
-      y += 20;
+      y += uiLine;
 
       // MAC Address
       uint8_t* bssid = WiFi.BSSID(networkIndex);
       String macAddress = bssidToString(bssid);
       M5.Display.setCursor(10, y);
       M5.Display.println("MAC: " + (macAddress.length() > 0 ? macAddress : "N/A"));
-      y += 20;
+      y += uiLine;
 
-      M5.Display.setCursor(35, 220);
-      M5.Display.println("Next");
-      M5.Display.setCursor(140, 220);
-      M5.Display.println("Back");
-      M5.Display.setCursor(238, 220);
-      M5.Display.println("Clone");
+      drawNavBar3("Next", "Back", "Clone");
 
       M5.Display.display();
       Serial.println("------Wifi-Info----");
@@ -1986,7 +2107,7 @@ void handleChangePassword() {
 
 void changePortal() {
   listPortalFiles();
-  const int listDisplayLimit = M5.Display.height() / 18;
+  const int listDisplayLimit = M5.Display.height() / uiListHeight;
   bool needDisplayUpdate = true;
   static bool isTouchHandled = false; // Pour suivre si le toucher a été géré
   // Attendre que l'utilisateur relâche tous les touchers avant de commencer
@@ -1999,18 +2120,18 @@ void changePortal() {
       int listStartIndex = max(0, min(portalFileIndex, numPortalFiles - listDisplayLimit));
 
       M5.Display.clear();
-      M5.Display.setTextSize(2);
+      M5.Display.setTextSize(uiTextSize);
       M5.Display.setTextColor(TFT_WHITE);
       M5.Display.setCursor(10, 10);
 
       for (int i = listStartIndex; i < min(numPortalFiles, listStartIndex + listDisplayLimit); i++) {
         if (i == portalFileIndex) {
-          M5.Display.fillRect(0, (i - listStartIndex) * 18, M5.Display.width(), 18, TFT_NAVY);
+          M5.Display.fillRect(0, (i - listStartIndex) * uiListHeight, M5.Display.width(), uiListHeight, TFT_NAVY);
           M5.Display.setTextColor(TFT_GREEN);
         } else {
           M5.Display.setTextColor(TFT_WHITE);
         }
-        M5.Display.setCursor(10, (i - listStartIndex) * 18);
+        M5.Display.setCursor(10, (i - listStartIndex) * uiListHeight);
         M5.Display.println(portalFiles[i].substring(7));
       }
       M5.Display.display();
@@ -2125,9 +2246,9 @@ void checkCredentials() {
 void displayCredentials(int index) {
   // Clear the display and set up text properties
   M5.Display.clear();
-  M5.Display.setTextSize(2);
+  M5.Display.setTextSize(uiTextSize);
 
-  int maxVisibleLines = M5.Display.height() / 18; // Nombre maximum de lignes affichables à l'écran
+  int maxVisibleLines = M5.Display.height() / uiListHeight; // Nombre maximum de lignes affichables à l'écran
   int currentLine = 0; // Ligne actuelle en cours de traitement
   int firstLineIndex = index; // Index de la première ligne de l'entrée sélectionnée
   int linesBeforeIndex = 0; // Nombre de lignes avant l'index sélectionné
@@ -2150,11 +2271,11 @@ void displayCredentials(int index) {
     int neededLines = 1 + M5.Display.textWidth(credential) / (M5.Display.width() - 20);
 
     if (i == index) {
-      M5.Display.fillRect(0, currentLine * 18, M5.Display.width(), 18 * neededLines, TFT_NAVY);
+      M5.Display.fillRect(0, currentLine * uiListHeight, M5.Display.width(), uiListHeight * neededLines, TFT_NAVY);
     }
 
     for (int line = 0; line < neededLines; line++) {
-      M5.Display.setCursor(10, (currentLine + line) * 18);
+      M5.Display.setCursor(10, (currentLine + line) * uiListHeight);
       M5.Display.setTextColor(i == index ? TFT_GREEN : TFT_WHITE);
 
       int startChar = line * (credential.length() / neededLines);
@@ -2177,13 +2298,7 @@ bool confirmPopup(String message) {
   M5.Display.setCursor(50, M5.Display.height() / 2);
   M5.Display.setTextColor(TFT_WHITE);
   M5.Display.println(message);
-  M5.Display.setCursor(37, 220);
-  M5.Display.setTextColor(TFT_GREEN);
-  M5.Display.println("Yes");
-  M5.Display.setTextColor(TFT_RED);
-  M5.Display.setCursor(254, 220);
-  M5.Display.println("No");
-  M5.Display.setTextColor(TFT_WHITE);
+  drawNavBar2Colored("Yes", TFT_GREEN, "No", TFT_RED);
 
   // Attendre que l'utilisateur relâche tous les touchers avant de commencer
   while (M5.Touch.getCount() != 0) {
@@ -2274,7 +2389,7 @@ void displayMonitorPage1() {
   }
 
   M5.Display.clear();
-  M5.Display.setTextSize(2);
+  M5.Display.setTextSize(uiTextSize);
   M5.Display.setTextColor(TFT_WHITE);
 
   M5.Display.setCursor(10, 90);
@@ -2298,14 +2413,14 @@ void displayMonitorPage1() {
     int newNumPasswords = countPasswordsInFile();
 
     if (newNumClients != oldNumClients) {
-      M5.Display.fillRect(10, 30, 200, 20, TFT_BLACK);
+      M5.Display.fillRect(10, 30, 200, uiLine, TFT_BLACK);
       M5.Display.setCursor(10, 30);
       M5.Display.println("Clients: " + String(newNumClients));
       oldNumClients = newNumClients;
     }
 
     if (newNumPasswords != oldNumPasswords) {
-      M5.Display.fillRect(10, 60, 200, 20, TFT_BLACK);
+      M5.Display.fillRect(10, 60, 200, uiLine, TFT_BLACK);
       M5.Display.setCursor(10, 60);
       M5.Display.println("Passwords: " + String(newNumPasswords));
       oldNumPasswords = newNumPasswords;
@@ -2361,7 +2476,7 @@ void displayMonitorPage2() {
   }
 
   M5.Display.clear();
-  M5.Display.setTextSize(2);
+  M5.Display.setTextSize(uiTextSize);
   updateConnectedMACs();
   if (macAddresses[0] == "") {
     M5.Display.setCursor(10, 30);
@@ -2372,7 +2487,7 @@ void displayMonitorPage2() {
   } else {
     Serial.println("----Mac-Address----");
     for (int i = 0; i < 10; i++) {
-      int y = 30 + i * 20;
+      int y = 30 + i * uiListHeight;
       if (y > M5.Display.height() - 20) break;
 
       M5.Display.setCursor(10, y);
@@ -2452,7 +2567,7 @@ void displayMonitorPage3() {
   }
 
   M5.Display.clear();
-  M5.Display.setTextSize(2);
+  M5.Display.setTextSize(uiTextSize);
   M5.Display.setTextColor(TFT_WHITE);
 
 
@@ -2496,28 +2611,28 @@ void displayMonitorPage3() {
       String newTemperature = getTemperature();
 
       if (newStack != oldStack) {
-        M5.Display.fillRect(10, 30, 200, 20, TFT_BLACK);
+        M5.Display.fillRect(10, 30, 200, uiLine, TFT_BLACK);
         M5.Display.setCursor(10, 30);
         M5.Display.println("Stack left: " + newStack + " Kb");
         oldStack = newStack;
       }
 
       if (newRamUsage != oldRamUsage) {
-        M5.Display.fillRect(10, 60, 200, 20, TFT_BLACK);
+        M5.Display.fillRect(10, 60, 200, uiLine, TFT_BLACK);
         M5.Display.setCursor(10, 60);
         M5.Display.println("RAM: " + newRamUsage + " Mo");
         oldRamUsage = newRamUsage;
       }
 
       if (newBatteryLevel != oldBatteryLevel) {
-        M5.Display.fillRect(10, 90, 200, 20, TFT_BLACK);
+        M5.Display.fillRect(10, 90, 200, uiLine, TFT_BLACK);
         M5.Display.setCursor(10, 90);
         M5.Display.println("Battery: " + newBatteryLevel + "%");// thx to kdv88 to pointing mistranlastion
         oldBatteryLevel = newBatteryLevel;
       }
 
       if (newTemperature != oldTemperature) {
-        M5.Display.fillRect(10, 120, 200, 20, TFT_BLACK);
+        M5.Display.fillRect(10, 120, 200, uiLine, TFT_BLACK);
         M5.Display.setCursor(10, 120);
         M5.Display.println("Temperature: " + newTemperature + "C");
         oldTemperature = newTemperature;
@@ -2591,8 +2706,8 @@ void karmaAttack() {
 
 void waitAndReturnToMenu(String message) {
   M5.Display.clear();
-  M5.Display.setTextSize(2);
-  M5.Display.fillRect(0, M5.Display.height() - 20, M5.Display.width(), 20, TFT_BLACK);
+  M5.Display.setTextSize(uiTextSize);
+  M5.Display.fillRect(0, M5.Display.height() - uiLine, M5.Display.width(), uiLine, TFT_BLACK);
   M5.Display.setCursor(50 , M5.Display.height() / 2 );
   M5.Display.println(message);
   M5.Display.display();
@@ -2614,7 +2729,7 @@ void brightness() {
   }
 
   M5.Display.clear();
-  M5.Display.setTextSize(2);
+  M5.Display.setTextSize(uiTextSize);
   M5.Display.setTextColor(TFT_WHITE);
   bool brightnessAdjusted = true;
 
@@ -2832,7 +2947,7 @@ void updateDisplayWithSSIDKarma(const char* ssidKarma, int count) {
 
   for (int i = startIndexKarma; i < count; i++) {
     int lineIndexKarma = i - startIndexKarma;
-    M5.Display.setCursor(0, lineIndexKarma * 20);
+    M5.Display.setCursor(0, lineIndexKarma * uiListHeight);
 
     if (strlen(ssidsKarma[i]) > maxLength) {
       strncpy(truncatedSSID, ssidsKarma[i], maxLength);
@@ -3017,12 +3132,15 @@ void handleMenuInputKarma() {
 
 void drawMenuKarma() {
   M5.Display.clear();
-  M5.Display.setTextSize(2);
+  M5.Display.setTextSize(uiTextSize);
   M5.Display.setTextFont(1);
 
-  int lineHeight = 24;
-  int startX = 10;
-  int startY = 25;
+  int lineHeight = uiLineHeight;
+  int startX = uiMargin;
+  int startY = uiIsLarge ? 8 : 25;
+  int glyphH = uiGlyphH * uiTextSize;
+  int textOffset = (lineHeight - glyphH) / 2;
+  if (textOffset < 0) textOffset = 0;
 
   for (int i = 0; i < maxMenuDisplayKarma; i++) {
     int menuIndexKarma = menuStartIndexKarma + i;
@@ -3030,11 +3148,12 @@ void drawMenuKarma() {
 
     if (menuIndexKarma == currentIndexKarma) {
       M5.Display.fillRect(0, startY + i * lineHeight, M5.Display.width(), lineHeight, TFT_NAVY);
+      if (uiIsLarge) M5.Display.fillRect(0, startY + i * lineHeight, 6, lineHeight, TFT_GREEN);
       M5.Display.setTextColor(TFT_GREEN);
     } else {
       M5.Display.setTextColor(TFT_WHITE);
     }
-    M5.Display.setCursor(startX, startY + i * lineHeight + (lineHeight / 2) - 8);
+    M5.Display.setCursor(startX, startY + i * lineHeight + textOffset);
     M5.Display.println(ssidsKarma[menuIndexKarma]);
   }
   M5.Display.display();
@@ -3080,18 +3199,18 @@ void startAPWithSSIDKarma(const char* ssid) {
     remainingTime = scanTimeKarma - ((currentTime - startTime) / 1000);
     clientCount = WiFi.softAPgetStationNum();
 
-    M5.Display.setCursor((M5.Display.width() - 12 * strlen(ssid)) / 2, 50);
+    M5.Display.setCursor((M5.Display.width() - (uiGlyphW * uiTextSize) * strlen(ssid)) / 2, 50);
     M5.Display.println(String(ssid));
 
-    int textWidth = 12 * 16;
-    M5.Display.fillRect((M5.Display.width() - textWidth) / 2, 90, textWidth, 20, TFT_BLACK);
+    int textWidth = (uiGlyphW * uiTextSize) * 16;
+    M5.Display.fillRect((M5.Display.width() - textWidth) / 2, 90, textWidth, uiLine, TFT_BLACK);
     M5.Display.setCursor((M5.Display.width() - textWidth) / 2, 90);
     M5.Display.print("Left Time: ");
     M5.Display.print(remainingTime);
     M5.Display.println(" s");
 
-    textWidth = 12 * 20;
-    M5.Display.fillRect((M5.Display.width() - textWidth) / 2, 130, textWidth, 20, TFT_BLACK);
+    textWidth = (uiGlyphW * uiTextSize) * 20;
+    M5.Display.fillRect((M5.Display.width() - textWidth) / 2, 130, textWidth, uiLine, TFT_BLACK);
     M5.Display.setCursor((M5.Display.width() - textWidth) / 2, 130);
     M5.Display.print("Connected Client: ");
     M5.Display.println(clientCount);
@@ -3103,8 +3222,7 @@ void startAPWithSSIDKarma(const char* ssid) {
     Serial.println("-------------------");
 
 
-    M5.Display.setCursor(130, 220);
-    M5.Display.println(" Stop");
+    drawNavCenter("Stop");
     M5.Display.display();
 
     if (remainingTime <= 0) {
@@ -3214,7 +3332,7 @@ void listProbes() {
 
     if (needDisplayUpdate) {
       M5.Display.clear();
-      M5.Display.setTextSize(2);
+      M5.Display.setTextSize(uiTextSize);
       int y = 10;
 
       for (int i = 0; i < maxDisplay && listStartIndex + i < numProbes; i++) {
@@ -3226,7 +3344,7 @@ void listProbes() {
         M5.Display.setCursor(10, y);
         M5.Display.setTextColor(probeIndex == currentListIndex ? TFT_GREEN : TFT_WHITE);
         M5.Display.println(ssid);
-        y += 20;
+        y += uiLine;
       }
 
       M5.Display.display();
@@ -3297,7 +3415,7 @@ void deleteProbe() {
     handleDnsRequestSerial();
     if (needDisplayUpdate) {
       M5.Display.clear();
-      M5.Display.setTextSize(2);
+      M5.Display.setTextSize(uiTextSize);
 
       for (int i = 0; i < maxDisplay; i++) {
         int probeIndex = listStartIndex + i;
@@ -3308,7 +3426,7 @@ void deleteProbe() {
           ssid = ssid.substring(0, maxSSIDLength) + "..";
         }
 
-        M5.Display.setCursor(10, i * 20 + 10);
+        M5.Display.setCursor(10, i * uiListHeight + 10);
         M5.Display.setTextColor(probeIndex == currentListIndex ? TFT_GREEN : TFT_WHITE);
         M5.Display.println(ssid);
       }
@@ -3411,10 +3529,10 @@ int showProbesAndSelect(String probes[], int numProbes) {
 
     if (needDisplayUpdate) {
       M5.Display.clear();
-      M5.Display.setTextSize(2);
+      M5.Display.setTextSize(uiTextSize);
 
       for (int i = 0; i < maxDisplay && (listStartIndex + i) < numProbes; i++) {
-        M5.Display.setCursor(10, i * 20 + 10);
+        M5.Display.setCursor(10, i * uiListHeight + 10);
         M5.Display.setTextColor((listStartIndex + i) == currentListIndex ? TFT_GREEN : TFT_WHITE);
         M5.Display.println(probes[listStartIndex + i]);
       }
@@ -3632,11 +3750,11 @@ void probeAttack() {
       }
       WiFi.begin(ssid.c_str(), "");
 
-      M5.Display.setCursor(probesTextX + probesText.length() * 12, 70);
-      M5.Display.fillRect(probesTextX + probesText.length() * 12, 70, 50, 20, TFT_BLACK);
+      M5.Display.setCursor(probesTextX + probesText.length() * (uiGlyphW * uiTextSize), 70);
+      M5.Display.fillRect(probesTextX + probesText.length() * (uiGlyphW * uiTextSize), 70, 50, uiLine, TFT_BLACK);
       M5.Display.print(++probeCount);
 
-      M5.Display.fillRect(100, M5.Display.height() / 2, 140, 20, TFT_BLACK);
+      M5.Display.fillRect(100, M5.Display.height() / 2, 140, uiLine, TFT_BLACK);
 
       M5.Display.setCursor(100, M5.Display.height() / 2);
       M5.Display.print("Delay: " + String(delayTime) + "ms");
@@ -4054,7 +4172,7 @@ void displayWaitingForProbe() {
     lastProbeDisplayUpdate = currentTime;
     probeDisplayState = (probeDisplayState + 1) % 4;
 
-    int x = 50 + 12 * strlen("Waiting for probe");
+    int x = 50 + (uiGlyphW * uiTextSize) * strlen("Waiting for probe");
     int y = M5.Display.height() / 2 - 20;
     int width = 36;
     int height = 20;
@@ -4076,28 +4194,27 @@ void displayAPStatus(const char* ssid, unsigned long startTime, int autoKarmaAPD
   if (!isInitialDisplayDone) {
     M5.Display.clear();
     M5.Display.setTextColor(TFT_WHITE);
-    M5.Display.setCursor((M5.Display.width() - 12 * strlen(ssid)) / 2, 50);
+    M5.Display.setCursor((M5.Display.width() - (uiGlyphW * uiTextSize) * strlen(ssid)) / 2, 50);
     M5.Display.println(String(ssid));
     M5.Display.setCursor((M5.Display.width() - 15 * strlen("Left Time: ")) / 2, 90);
     M5.Display.print("Left Time: ");
-    M5.Display.setCursor((M5.Display.width() - 12 * strlen("Connected Client: ")) / 2, 130);
+    M5.Display.setCursor((M5.Display.width() - (uiGlyphW * uiTextSize) * strlen("Connected Client: ")) / 2, 130);
     M5.Display.print("Connected Client: ");
 
-    M5.Display.setCursor(140, 220);
-    M5.Display.println("Stop");
+    drawNavCenter("Stop");
     isInitialDisplayDone = true;
   }
 
-  int timeValuePosX = (M5.Display.width() + 12 * strlen("Left Time: ")) / 2;
+  int timeValuePosX = (M5.Display.width() + (uiGlyphW * uiTextSize) * strlen("Left Time: ")) / 2;
   int timeValuePosY = 90;
-  M5.Display.fillRect(timeValuePosX, timeValuePosY, 12 * 5, 20, TFT_BLACK);
+  M5.Display.fillRect(timeValuePosX, timeValuePosY, (uiGlyphW * uiTextSize) * 5, uiLine, TFT_BLACK);
   M5.Display.setCursor(timeValuePosX, timeValuePosY);
   M5.Display.print(remainingTime);
   M5.Display.println(" s");
 
-  int clientValuePosX = (M5.Display.width() + 12 * strlen("Connected Client: ")) / 2;
+  int clientValuePosX = (M5.Display.width() + (uiGlyphW * uiTextSize) * strlen("Connected Client: ")) / 2;
   int clientValuePosY = 130;
-  M5.Display.fillRect(clientValuePosX, clientValuePosY, 12 * 5, 20, TFT_BLACK);
+  M5.Display.fillRect(clientValuePosX, clientValuePosY, (uiGlyphW * uiTextSize) * 5, uiLine, TFT_BLACK);
   M5.Display.setCursor(clientValuePosX, clientValuePosY);
   M5.Display.print(clientCount);
 }
@@ -4134,7 +4251,7 @@ void wardrivingMode() {
   Serial.println("-------------------");
   M5.Lcd.fillScreen(TFT_BLACK);
   M5.Lcd.setTextColor(TFT_WHITE, TFT_BLACK);
-  M5.Lcd.setTextSize(2);
+  M5.Lcd.setTextSize(uiTextSize);
   M5.Display.fillRect(0, M5.Display.height() - 60, M5.Display.width(), 60, TFT_RED);
   M5.Display.setCursor(135, M5.Display.height() - 40);
   M5.Display.setTextColor(TFT_WHITE);
@@ -4564,7 +4681,7 @@ void beaconAttack() {
       M5.Display.setCursor(x, y);
       M5.Display.setTextSize(1.5);
       M5.Display.print(ssid);
-      M5.Display.setTextSize(2);
+      M5.Display.setTextSize(uiTextSize);
       WiFi.softAP(ssid.c_str());
       delay(50);
       for (int channel = 1; channel <= 13; ++channel) {
@@ -4727,7 +4844,7 @@ void deauthDetect() {
   }
 
   M5.Display.clear();
-  M5.Lcd.setTextSize(2);
+  M5.Lcd.setTextSize(uiTextSize);
   M5.Lcd.setTextColor(WHITE, BLACK);
   //ESP_BT.end();
   //bluetoothEnabled = false;
@@ -4971,12 +5088,11 @@ void wallOfFlipper() {
   bool btnBPressed = false; //debounce
   M5.Display.fillScreen(BLACK);
   M5.Display.setCursor(0, 10);
-  M5.Display.setTextSize(2);
+  M5.Display.setTextSize(uiTextSize);
   M5.Display.setTextColor(WHITE);
   M5.Display.println("Waiting for Flipper");
 
-  M5.Lcd.setCursor(140, 220);
-  M5.Lcd.println("Stop");
+  drawNavCenter("Stop");
   initializeBLEIfNeeded();
   delay(200);
   // Attendre que l'utilisateur relâche tous les touchers avant de commencer
@@ -4997,11 +5113,10 @@ void wallOfFlipper() {
     if (millis() - lastFlipperFoundMillis > 10000) { // 30000 millisecondes = 30 secondes
       M5.Display.fillScreen(BLACK);
       M5.Display.setCursor(0, 10);
-      M5.Display.setTextSize(2);
+      M5.Display.setTextSize(uiTextSize);
       M5.Display.setTextColor(WHITE);
       M5.Display.println("Waiting for Flipper");
-      M5.Lcd.setCursor(140, 220);
-      M5.Lcd.println("Stop");
+      drawNavCenter("Stop");
 
       lastFlipperFoundMillis = millis();
     }
