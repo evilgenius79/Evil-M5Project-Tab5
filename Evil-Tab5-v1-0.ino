@@ -182,13 +182,16 @@ void initUiScale() {
   uiGlyphH = 8;
   if (w >= 700) {           // Tab5 / large landscape panels
     uiIsLarge   = true;
-    uiTextSize  = 4;
-    uiSmallText = 3;
-    uiLineHeight = uiGlyphH * uiTextSize + 20;      // 52 px menu rows
-    uiListHeight = uiGlyphH * uiTextSize + 8;        // 40 px list rows (fits size-4 text)
-    uiLine      = uiGlyphH * uiTextSize + 6;         // 38 px detail line advance
-    uiMargin    = 24;
-    uiNavY      = h - (uiGlyphH * uiSmallText) - 14; // nav bar pinned to bottom
+    // Base text size 3 (24 px tall). Many legacy status/detail screens place text
+    // at hard-coded rows ~30 px apart; size 4 (32 px) overran them, so 3 keeps text
+    // large but avoids overlap. Change this one value to rescale the whole UI.
+    uiTextSize  = 3;
+    uiSmallText = 2;
+    uiLineHeight = uiGlyphH * uiTextSize + 16;      // 40 px menu rows
+    uiListHeight = uiGlyphH * uiTextSize + 8;        // 32 px list rows (fits size-3 text)
+    uiLine      = uiGlyphH * uiTextSize + 8;         // 32 px detail line advance
+    uiMargin    = 20;
+    uiNavY      = h - (uiGlyphH * uiSmallText) - 16; // nav bar pinned to bottom
     // Fill the panel: leave room for the bottom nav bar.
     maxMenuDisplay = (uiNavY - 8) / uiLineHeight;
     maxMenuDisplayKarma = (h - 30) / uiLineHeight;
