@@ -107,6 +107,10 @@ https://github.com/7h30th3r0n3/Evil-M5Project/wiki
     <td><a href="https://shop.m5stack.com/products/m5stack-cores3-se-iot-controller-w-o-battery-bottom?ref=7h30th3r0n3">M5Stack</a></td>
   </tr>
   <tr>
+    <td>M5Stack Tab5 (Beta – ESP32-P4)</td>
+    <td><a href="https://shop.m5stack.com/products/m5stack-tab5-iot-development-kit-esp32-p4?ref=7h30th3r0n3">M5Stack</a></td>
+  </tr>
+  <tr>
     <td>M5AtomS3 (GPS needed)</td>
     <td><a href="https://shop.m5stack.com/products/atoms3-dev-kit-w-0-85-inch-screen?ref=7h30th3r0n3">M5Stack</a></td>
   </tr>
@@ -152,6 +156,52 @@ https://github.com/7h30th3r0n3/Evil-M5Project/wiki
     <a href="https://s.click.aliexpress.com/e/_oB7Yknf">DIY</a>
   </li>
 </ul>
+
+---
+
+## 🧪 M5Stack Tab5 (ESP32-P4) — Beta Notes
+
+The **Tab5** firmware is `Evil-Tab5-v1-0.ino`, a port of `Evil-M5Core3` (the closest
+existing device: a large touch screen with no keyboard, driven by M5Unified). The Tab5
+is architecturally different from every other supported device, so read this before
+flashing:
+
+- **SoC / radio:** The Tab5's main chip is an **ESP32-P4 (RISC-V)** which has **no
+  native Wi-Fi or Bluetooth**. Wi-Fi 2.4 GHz and BLE are provided by an on-board
+  **ESP32-C6** that the P4 drives over ESP-Hosted (SDIO). The usual `WiFi.h` /
+  `esp_wifi_*` calls are routed to the C6 through `esp_wifi_remote`. Promiscuous mode
+  and raw `esp_wifi_80211_tx()` are exposed through that remote layer, but throughput
+  and frame handling are more constrained than on a native ESP32, and behaviour
+  depends on your installed arduino-esp32 / `esp_wifi_remote` version. **Monitor-mode
+  and injection-heavy features (sniffing, deauth, karma, handshake capture) should be
+  validated on hardware** — they are the ones most likely to differ from Core3.
+- **No 5 GHz:** the C6 is 2.4 GHz only.
+- **microSD:** the Tab5 wires the card in **SDMMC/SDIO mode** (CLK 43, CMD 44,
+  D0–D3 39/40/41/42), not SPI, so this port mounts it through `SD_MMC` instead of the
+  SPI `SD` driver used by the other devices.
+- **No RGB LED:** the Tab5 has no NeoPixel, so the LED animation is disabled.
+
+### Pair it with an ESP32-C5 for what the Tab5 lacks
+For **5 GHz** work, and to offload monitor/deauth/EAPOL from the hosted C6 radio, pair
+the Tab5 with an external **ESP32-C5 (e.g. M5Stamp C5)** running the firmware in
+[`slave/C5-Slave`](./slave/C5-Slave). The C5 does dual-band (2.4 + 5.8 GHz) scan /
+deauth / sniff and forwards results, exactly like the ESP32-C5 Serial Toolkit already
+used on the Cardputer. This is the recommended way to get robust radio attacks on the
+Tab5 platform.
+
+### Build settings (Tab5 / ESP32-P4)
+- Install the Espressif **ESP32 core with ESP32-P4 support** and select the
+  **M5Stack Tab5 / ESP32-P4** board.
+- Requires an up-to-date **M5Unified / M5GFX** (Tab5 panel + `board_M5Tab5` support).
+- Wi-Fi on the P4 pulls in the `esp_wifi_remote` / ESP-Hosted component for the C6.
+- Because the P4 has abundant PSRAM (32 MB) and flash (16 MB), pick a large-app
+  partition scheme so the full feature set fits.
+
+> ⚠️ Tab5 support is new and hardware-dependent. The device is recognised
+> (`M5.getBoard() == board_M5Tab5`), the display/touch/SD paths are adapted, and the
+> app logic is identical to the proven Core3 build — but the ESP32-P4 + hosted-C6
+> radio path has not been through the same field testing as the native-ESP32 devices.
+> Please report results on the Discord.
 
 ---
 
