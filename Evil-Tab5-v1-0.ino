@@ -16,9 +16,11 @@
      - No 5GHz  : the C6 is 2.4GHz only. For 5GHz work (and to offload monitor/
                   deauth/EAPOL from the hosted radio) pair the Tab5 with an external
                   ESP32-C5 running the firmware in slave/C5-Slave (see README).
-     - SD card  : Tab5 wires the microSD in SDMMC/SDIO mode (not SPI), so this port
-                  mounts it through SD_MMC. See the SD section below.
-     - No RGB LED: the Tab5 has no NeoPixel, so the LED animation is disabled here.
+     - SD card  : driven over SPI (SCK 43, MISO 39, MOSI 44, CS 42), verified against
+                  7h30th3r0n3's own Tab5 port. See the SD section below.
+     - LED      : NeoPixel disabled. On the Tab5, GPIO15 (the LED pin on other M5
+                  devices) is the ESP32-C6 Wi-Fi RESET line, so driving it would reset
+                  the radio. ledOn is forced false and pixels.begin() is guarded.
 
    Copyright (c) 2024 7h30th3r0n3
 
@@ -53,7 +55,7 @@
 #include <WebServer.h>
 #include <DNSServer.h>
 #include <SD.h>
-#include <SD_MMC.h> // Tab5 microSD is wired in SDMMC/SDIO mode, not SPI
+#include <SPI.h> // Tab5 microSD is driven over SPI (verified against 7h30th3r0n3's Tab5 port)
 #include <M5Unified.h>
 #include <vector>
 #include <string>
@@ -72,19 +74,13 @@ extern "C" {
 // ---------------------------------------------------------------------------
 // Tab5 SD card: the ESP32-P4 on the Tab5 exposes the microSD over SDMMC/SDIO,
 // so the Arduino "SD" (SPI) driver used by the other Evil-M5 devices does not
-// work here. SD_MMC exposes the exact same fs::FS API (open/exists/remove/
-// mkdir/...), so we alias the whole codebase's "SD" references to SD_MMC.
-// The single SPI-style SD.begin() in setup() is rewritten to SD_MMC.begin().
-// This #define is placed AFTER the includes so <SD.h>/<SD_MMC.h> are untouched,
-// and the preprocessor never rewrites the "SD" text inside string literals.
-#define SD SD_MMC
-// Tab5 SDMMC (4-bit) pin map, verified from the M5Stack Tab5 documentation.
-#define TAB5_SD_CLK  43
-#define TAB5_SD_CMD  44
-#define TAB5_SD_D0   39
-#define TAB5_SD_D1   40
-#define TAB5_SD_D2   41
-#define TAB5_SD_D3   42
+// work here. The Tab5 exposes the card on a dedicated SPI bus; these pins and the
+// SPI approach are taken from 7h30th3r0n3's own Tab5 port (verified on hardware),
+// so we use the standard Arduino SD (SPI) driver with an explicit SPI.begin().
+#define TAB5_SD_SCK  43
+#define TAB5_SD_MISO 39
+#define TAB5_SD_MOSI 44
+#define TAB5_SD_CS   42
 // ---------------------------------------------------------------------------
 
 int ledOn = false;// Tab5 has no NeoPixel RGB LED, so the LED effect is disabled
@@ -364,8 +360,8 @@ void setup() {
       // Tab5 (ESP32-P4). GPS is optional and attaches to a Grove/expansion port.
       // These are best-effort UART pins on Port A of the Tab5 header; verify the
       // exact GPIOs of the port you use before relying on wardriving GPS.
-      GPS_RX_PIN = 53;
-      GPS_TX_PIN = 54;
+      GPS_RX_PIN = 38; // verified against 7h30th3r0n3's Tab5 port
+      GPS_TX_PIN = 37;
       Serial.println("M5Tab5 Board detected.");
       break;
     default:
@@ -529,10 +525,9 @@ void setup() {
   int randomIndex = random(numMessages);
   const char* randomMessage = startUpMessages[randomIndex];
 
-  // Tab5 microSD is on the SDMMC/SDIO bus (4-bit). SD is #defined to SD_MMC above,
-  // so every other SD.* call in this firmware transparently uses the SDMMC driver.
-  SD_MMC.setPins(TAB5_SD_CLK, TAB5_SD_CMD, TAB5_SD_D0, TAB5_SD_D1, TAB5_SD_D2, TAB5_SD_D3);
-  if (!SD_MMC.begin("/sdcard", false /* 4-bit mode */, false)) {
+  // Tab5 microSD over SPI (pins verified against 7h30th3r0n3's Tab5 port).
+  SPI.begin(TAB5_SD_SCK, TAB5_SD_MISO, TAB5_SD_MOSI, TAB5_SD_CS);
+  if (!SD.begin(TAB5_SD_CS, SPI, 25000000)) {
     Serial.println("Error..");
     Serial.println("SD card not mounted...");
   } else {

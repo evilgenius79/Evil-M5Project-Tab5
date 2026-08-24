@@ -9,7 +9,7 @@ M5 devices keep working exactly as before.
 - **New firmware: [`Evil-Tab5-v1-0.ino`](./Evil-Tab5-v1-0.ino)** — a Tab5 port of
   `Evil-M5Core3` (closest analog: a large M5Unified touch device with no keyboard).
 - **Tab5 board detection** via `m5::board_t::board_M5Tab5`.
-- **SDMMC/SDIO microSD** support (the Tab5 wires the card over SDIO, not SPI).
+- **microSD over SPI** (SCK 43, MISO 39, MOSI 44, CS 42), pins verified against the original author's Tab5 port.
 - **UI scaled for the Tab5's 1280×720 panel** — larger text, full-height menus and
   lists, centred splash, and a bottom navigation bar (all driven by one scale knob).
 - **Docs:** the [Tab5 Beta Notes](#tab5-notes) section below,
@@ -206,10 +206,12 @@ flashing:
   and injection-heavy features (sniffing, deauth, karma, handshake capture) should be
   validated on hardware** — they are the ones most likely to differ from Core3.
 - **No 5 GHz:** the C6 is 2.4 GHz only.
-- **microSD:** the Tab5 wires the card in **SDMMC/SDIO mode** (CLK 43, CMD 44,
-  D0–D3 39/40/41/42), not SPI, so this port mounts it through `SD_MMC` instead of the
-  SPI `SD` driver used by the other devices.
-- **No RGB LED:** the Tab5 has no NeoPixel, so the LED animation is disabled.
+- **microSD:** driven over **SPI** (SCK 43, MISO 39, MOSI 44, CS 42) with the standard
+  Arduino `SD` driver. These pins/approach are verified against the original author's
+  own Tab5 port.
+- **LED:** NeoPixel disabled. On the Tab5, **GPIO15** (the LED pin on other M5 devices)
+  is the **ESP32-C6 Wi-Fi RESET** line — driving it would reset the radio — so the LED
+  is forced off and its init is guarded.
 
 ### Pair it with an ESP32-C5 for what the Tab5 lacks
 For **5 GHz** work, and to offload monitor/deauth/EAPOL from the hosted C6 radio, pair
