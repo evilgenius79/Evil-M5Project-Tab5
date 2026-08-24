@@ -226,6 +226,9 @@ Tab5 platform.
 - Wi-Fi on the P4 pulls in the `esp_wifi_remote` / ESP-Hosted component for the C6.
 - Because the P4 has abundant PSRAM (32 MB) and flash (16 MB), pick a large-app
   partition scheme so the full feature set fits.
+- **PlatformIO:** a ready [`platformio.ini`](./platformio.ini) is included (env
+  `m5tab5`, using the pioarduino ESP32-P4 platform). Build with `pio run -e m5tab5`
+  and flash with `pio run -e m5tab5 -t upload` after entering download mode.
 
 > ⚠️ Tab5 support is new and hardware-dependent. The device is recognised
 > (`M5.getBoard() == board_M5Tab5`), the display/touch/SD paths are adapted, and the
