@@ -199,10 +199,19 @@ String scanIp = "";
 #endif
 
 //ssh
+// SSH Shell needs the LibSSH-ESP32 library, which is not in the Arduino Library
+// Manager and may not build for the ESP32-P4. It is disabled by default so the
+// rest of the firmware compiles without it. Set EVIL_ENABLE_SSH to 1 (and install
+// LibSSH-ESP32) to build the SSH Shell feature.
+#ifndef EVIL_ENABLE_SSH
+#define EVIL_ENABLE_SSH 0
+#endif
+#if EVIL_ENABLE_SSH
 #include "libssh_esp32.h"
 #include <libssh/libssh.h>
 int evil_ssh_authenticate(ssh_session session, const char *password);
 ssh_session connect_ssh(const char *host, const char *user, int port);
+#endif
 
 String ssh_user = "";
 String ssh_host = "";
@@ -217,8 +226,10 @@ static void* evilAlloc(size_t size) {
 
 
 // SSH session and channel
+#if EVIL_ENABLE_SSH
 ssh_session my_ssh_session;
 ssh_channel my_channel;
+#endif
 //ssh end
 
 String tcp_host = "";
@@ -12955,6 +12966,7 @@ connect to SSH
 ============================================================================================================================
 */
 //from https://github.com/fernandofatech/M5Cardputer-SSHClient and refactored
+#if EVIL_ENABLE_SSH
 bool sshKilled = false;
 void testConnectivity(const char *host) {
   M5.Display.clear();
@@ -13361,6 +13373,21 @@ void sshTask(void *pvParameters) {
 
   vTaskDelete(NULL);
 }
+#else
+// SSH Shell disabled at build time (EVIL_ENABLE_SSH=0). This stub keeps the menu
+// entry (case 35 -> sshConnect()) valid without pulling in LibSSH-ESP32.
+void sshConnect(const char *host) {
+  (void)host;
+  M5.Display.clear();
+  M5.Display.setTextSize(UI_TS_MD);
+  M5.Display.setTextColor(TFT_WHITE);
+  M5.Display.setCursor(UI_PAD_MD, sy(10));
+  M5.Display.println("SSH Shell disabled");
+  M5.Display.setCursor(UI_PAD_MD, sy(30));
+  M5.Display.println("in this build.");
+  delay(1500);
+}
+#endif
 
 // connect to SSH End
 
