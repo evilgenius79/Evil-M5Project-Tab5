@@ -1,3 +1,32 @@
+# 🆕 This fork: M5Stack Tab5 (ESP32-P4) support
+
+This fork of **Evil-M5Project** adds support for the **M5Stack Tab5** (ESP32-P4) on top
+of everything the upstream project already does. Nothing existing was removed — the Tab5
+is added the same way every other device is (its own firmware `.ino`), so all other
+M5 devices keep working exactly as before.
+
+**What this fork changes / adds**
+- **New firmware: [`Evil-Tab5-v1-0.ino`](./Evil-Tab5-v1-0.ino)** — a Tab5 port of
+  `Evil-M5Core3` (closest analog: a large M5Unified touch device with no keyboard).
+- **Tab5 board detection** via `m5::board_t::board_M5Tab5`.
+- **SDMMC/SDIO microSD** support (the Tab5 wires the card over SDIO, not SPI).
+- **UI scaled for the Tab5's 1280×720 panel** — larger text, full-height menus and
+  lists, centred splash, and a bottom navigation bar (all driven by one scale knob).
+- **Docs:** the [Tab5 Beta Notes](#tab5-notes) section below,
+  covering the ESP32-P4 + hosted ESP32-C6 radio, its limits, and build settings.
+
+**Tab5 needs a WiFi co-processor for full support.** The Tab5's main SoC (ESP32-P4)
+has **no native radio** — WiFi/BLE come from an on-board ESP32-C6 (2.4 GHz only) over
+ESP-Hosted. For 5 GHz and robust monitor/deauth/EAPOL work, pair the Tab5 with an
+external **ESP32-C5 (e.g. M5Stamp C5)** running [`slave/C5-Slave`](./slave/C5-Slave).
+See the [Tab5 Beta Notes](#tab5-notes) for details.
+
+> ⚠️ Tab5 support is new and hardware-dependent: the app logic is identical to the
+> proven Core3 build, but the ESP32-P4 + hosted-C6 path has not had the same field
+> testing as the native-ESP32 devices. Verify radio-heavy features on hardware.
+
+---
+
 <div align="center">
   
   # Evil-M5Project
@@ -159,6 +188,7 @@ https://github.com/7h30th3r0n3/Evil-M5Project/wiki
 
 ---
 
+<a id="tab5-notes"></a>
 ## 🧪 M5Stack Tab5 (ESP32-P4) — Beta Notes
 
 The **Tab5** firmware is `Evil-Tab5-v1-0.ino`, a port of `Evil-M5Core3` (the closest
