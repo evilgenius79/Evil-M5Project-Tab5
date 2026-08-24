@@ -188,8 +188,12 @@ String scanIp = "";
 #include <lwip/ip_addr.h>
 #include <ESPping.h>
 
-// Disable AsyncWebServer on ESP-IDF 5.x to avoid middleware symbol conflicts with WebServer
-#define EVIL_DISABLE_ASYNC_WEBSERVER 0
+// Disable AsyncWebServer on ESP-IDF 5.x to avoid middleware symbol conflicts with WebServer.
+// Set to 1 (disabled) for the P4/core-3.x baseline build: the old me-no-dev
+// ESPAsyncWebServer uses mbedtls *_ret() functions removed in core 3.x and fails to
+// compile. Re-enable (0) only with the maintained ESP32Async ESPAsyncWebServer fork.
+// This gates only the WiFi Dead Drop web UI.
+#define EVIL_DISABLE_ASYNC_WEBSERVER 1
 #ifndef EVIL_DISABLE_AUDIO
   #if defined(CONFIG_IDF_TARGET_ESP32P4)
     #define EVIL_DISABLE_AUDIO 1   // ESP32-P4: legacy I2S driver conflicts with M5Unified
