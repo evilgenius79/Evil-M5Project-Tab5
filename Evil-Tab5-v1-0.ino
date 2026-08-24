@@ -101,6 +101,7 @@ const char* menuItems[] = {"Scan WiFi", "Select Network", "Clone & Details" , "S
 const int menuSize = sizeof(menuItems) / sizeof(menuItems[0]);
 
 int maxMenuDisplay = 10; // number of visible menu rows (scaled up on Tab5 at boot)
+int maxMenuDisplayKarma = 9; // visible karma rows (scaled up on Tab5 at boot); declared here so initUiScale() sees it
 int menuStartIndex = 0;
 
 // ---------------------------------------------------------------------------
@@ -255,7 +256,7 @@ bool isScanningKarma = false;
 int currentIndexKarma = -1;
 int menuStartIndexKarma = 0;
 int menuSizeKarma = 0;
-int maxMenuDisplayKarma = 9; // visible karma rows (scaled up on Tab5 at boot)
+// maxMenuDisplayKarma is declared earlier (near maxMenuDisplay) so initUiScale() can see it.
 
 enum AppState {
   StartScanKarma,
@@ -2454,16 +2455,20 @@ void displayMonitorPage1() {
 }
 
 void updateConnectedMACs() {
+  // The old tcpip_adapter_get_sta_list() API was removed in ESP32 Arduino core 3.x
+  // (required by the ESP32-P4). We only ever use the MAC, which esp_wifi_ap_get_sta_list()
+  // already provides, so read it straight from wifi_sta_list_t.
   wifi_sta_list_t stationList;
-  tcpip_adapter_sta_list_t adapterList;
-  esp_wifi_ap_get_sta_list(&stationList);
-  tcpip_adapter_get_sta_list(&stationList, &adapterList);
+  if (esp_wifi_ap_get_sta_list(&stationList) != ESP_OK) {
+    stationList.num = 0;
+  }
 
-  for (int i = 0; i < adapterList.num; i++) {
+  int maxMacs = sizeof(macAddresses) / sizeof(macAddresses[0]);
+  for (int i = 0; i < stationList.num && i < maxMacs; i++) {
     char macStr[18];
     snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
-             adapterList.sta[i].mac[0], adapterList.sta[i].mac[1], adapterList.sta[i].mac[2],
-             adapterList.sta[i].mac[3], adapterList.sta[i].mac[4], adapterList.sta[i].mac[5]);
+             stationList.sta[i].mac[0], stationList.sta[i].mac[1], stationList.sta[i].mac[2],
+             stationList.sta[i].mac[3], stationList.sta[i].mac[4], stationList.sta[i].mac[5]);
     macAddresses[i] = String(macStr);
   }
 }
@@ -5015,9 +5020,10 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
         lastFlipperFoundMillis = millis();
       }
 
-      std::string advData = advertisedDevice.getManufacturerData();
-      if (!advData.empty()) {
-        const uint8_t* payload = reinterpret_cast<const uint8_t*>(advData.data());
+      // ESP32 Arduino core 3.x returns String (not std::string) from getManufacturerData().
+      String advData = advertisedDevice.getManufacturerData();
+      if (advData.length() > 0) {
+        const uint8_t* payload = reinterpret_cast<const uint8_t*>(advData.c_str());
         size_t length = advData.length();
         for (auto& packet : forbiddenPackets) {
           if (matchPattern(packet.pattern, payload, length)) {
