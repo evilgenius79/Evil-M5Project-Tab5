@@ -219,16 +219,52 @@ deauth / sniff and forwards results, exactly like the ESP32-C5 Serial Toolkit al
 used on the Cardputer. This is the recommended way to get robust radio attacks on the
 Tab5 platform.
 
-### Build settings (Tab5 / ESP32-P4)
-- Install the Espressif **ESP32 core with ESP32-P4 support** and select the
-  **M5Stack Tab5 / ESP32-P4** board.
-- Requires an up-to-date **M5Unified / M5GFX** (Tab5 panel + `board_M5Tab5` support).
-- Wi-Fi on the P4 pulls in the `esp_wifi_remote` / ESP-Hosted component for the C6.
-- Because the P4 has abundant PSRAM (32 MB) and flash (16 MB), pick a large-app
-  partition scheme so the full feature set fits.
-- **PlatformIO:** a ready [`platformio.ini`](./platformio.ini) is included (env
-  `m5tab5`, using the pioarduino ESP32-P4 platform). Build with `pio run -e m5tab5`
-  and flash with `pio run -e m5tab5 -t upload` after entering download mode.
+### Compile in the Arduino IDE (Tab5 / ESP32-P4)
+
+**1. Board / core**
+- Install a recent **ESP32 Arduino core with ESP32-P4 support** (via the M5Stack /
+  Espressif boards URL), then select the **M5Tab5** board. An older core will not
+  list the Tab5 — update it first.
+
+**2. Required libraries** (Tools → Manage Libraries…). Install these *exact* entries:
+
+| Library (search name in Library Manager) | Author | Min version | Provides / notes |
+|------------------------------------------|--------|-------------|------------------|
+| **M5Unified**   | M5Stack   | ≥ **0.2.17** | core device API; also pulls in M5GFX |
+| **M5GFX**       | M5Stack   | ≥ **0.2.22** | Tab5 panel + `board_M5Tab5` support |
+| **TinyGPSPlus** | Mikal Hart | ≥ 1.0.3 | provides `TinyGPS++.h` — see note below |
+| **Adafruit NeoPixel** | Adafruit | ≥ 1.12.0 | LED lib (LED is disabled on Tab5, but the include must resolve) |
+| **ArduinoJson** | Benoit Blanchon | **6.x** | use a **6.x** release — the code uses the v6 API |
+
+> ⚠️ **TinyGPSPlus vs `TinyGPS++.h`:** the sketch includes `TinyGPS++.h` (two `+`),
+> which is correct — that is the real header name. But in Library Manager there is
+> **no** entry called "TinyGPS++". The library that ships that header is
+> **"TinyGPSPlus" by Mikal Hart** (`mikalhart/TinyGPSPlus`). Installing the older
+> **"TinyGPS"** (header `TinyGPS.h`, no `++`) will *not* satisfy the include and you
+> will get `fatal error: TinyGPS++.h: No such file or directory`. Do not edit the
+> include — install the right library. After install, confirm the file exists at
+> `…/Arduino/libraries/TinyGPSPlus/src/TinyGPS++.h`.
+>
+> `WiFi`, `WebServer`, `DNSServer`, `SD`, `SD_MMC` and `BLEDevice` come from the ESP32
+> core itself and do **not** need to be installed separately.
+
+**3. Board settings (Tools menu)**
+- **Partition Scheme:** a large-app / 16MB scheme (the P4 has 16 MB flash, 32 MB PSRAM).
+- **PSRAM:** enabled.
+- Wi-Fi on the P4 automatically pulls in the `esp_wifi_remote` / ESP-Hosted component
+  that talks to the on-board ESP32-C6.
+
+**4. Upload (enter download mode first)**
+- Connect **USB-C** (or have battery power).
+- **Long-press Reset ~2 s** until the internal green LED blinks rapidly, then release
+  to enter download mode.
+- Select the port and click Upload.
+
+### Build with PlatformIO
+A ready [`platformio.ini`](./platformio.ini) is included (env `m5tab5`, using the
+**pioarduino** ESP32-P4 platform; it compiles only the Tab5 sketch and pins the
+library versions above). Build with `pio run -e m5tab5` and flash with
+`pio run -e m5tab5 -t upload` after entering download mode.
 
 > ⚠️ Tab5 support is new and hardware-dependent. The device is recognised
 > (`M5.getBoard() == board_M5Tab5`), the display/touch/SD paths are adapted, and the
