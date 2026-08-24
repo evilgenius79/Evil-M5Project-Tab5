@@ -249,7 +249,12 @@ Tab5 platform.
 > core itself and do **not** need to be installed separately.
 
 **3. Board settings (Tools menu)**
-- **Partition Scheme:** a large-app / 16MB scheme (the P4 has 16 MB flash, 32 MB PSRAM).
+- **Partition Scheme:** choose **`Default (2 x 6.5 MB app, 3.6 MB SPIFFS)`**. This
+  build includes the BLE stack + WiFi + M5GFX and can approach ~3 MB, so give the app
+  plenty of room. `16M Flash (3MB APP/…)` can also work but leaves little margin — if
+  upload fails with "sketch too big", switch to the 6.5 MB-app scheme. The firmware
+  keeps all its files on the **microSD card**, so the internal SPIFFS/FATFS size is
+  unused — don't pick a layout just for it, and don't use a 4 MB "Huge APP" scheme.
 - **PSRAM:** enabled.
 - Wi-Fi on the P4 automatically pulls in the `esp_wifi_remote` / ESP-Hosted component
   that talks to the on-board ESP32-C6.
