@@ -4025,11 +4025,12 @@ void showWifiList() {
         // SSID tronqué
         int textX = LEFT_PAD + ICON_W;
         int maxTextW = max(0, metaX - textX - 2);
+        // Draw the SSID at the SAME size it was measured/truncated at (UI_WLIST_TEXT).
+        // The previous UI_TS_MD override printed wider than the truncation allowed and
+        // taller than ROW_H, so long names overran into the meta column and the next row.
         String line = truncateToWidth(ssidList[i], maxTextW);
-        M5.Display.setTextSize(UI_TS_MD);
         M5.Display.setCursor(textX, y + 1);
         M5.Display.print(line);
-        M5.Display.setTextSize(UI_WLIST_TEXT);
         
         // Méta
         M5.Display.setCursor(metaX, y + 1);
