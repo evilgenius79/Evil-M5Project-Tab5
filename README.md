@@ -267,18 +267,6 @@ Tab5 platform.
   to enter download mode.
 - Select the port and click Upload.
 
-### Build with PlatformIO
-A ready [`platformio.ini`](./platformio.ini) is included (using the **pioarduino**
-ESP32-P4 platform). Because PlatformIO compiles *every* `.ino` under `src_dir`
-together, the full port lives in its own folder — `Evil-M5Tab5/Evil-M5Tab5.ino` —
-and `src_dir` points at that folder so only it is built. It pulls in the required
-libraries automatically (M5Unified, M5GFX, NeoPixel, TinyGPSPlus, ArduinoJson,
-IniFile, ESPping) and needs neither libssh nor ESPAsyncWebServer (SSH and async are
-off in-source).
-
-Build with `pio run -e m5tab5-full` and flash with `pio run -e m5tab5-full -t upload`
-after entering download mode.
-
 > ⚠️ Tab5 support is new and hardware-dependent. The device is recognised
 > (`M5.getBoard() == board_M5Tab5`), the display/touch/SD paths are adapted, and the
 > app logic is identical to the proven Core3 build — but the ESP32-P4 + hosted-C6
