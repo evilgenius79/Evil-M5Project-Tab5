@@ -28267,30 +28267,35 @@ void ddDrawHeader(const char* title) {
   M5.Display.setCursor(sx(6), sy(4)); M5.Display.print(title);
 }
 
-void ddDrawTextLine(int x, int y, const char* label, const char* value) {
+// NOTE: ddDraw* helpers take Cardputer REF coordinates (240x135) and scale them to
+// the real panel via sx()/sy(), so all call sites can keep their original layout.
+void ddDrawTextLine(int rx, int ry, const char* label, const char* value) {
+  int x = sx(rx), y = sy(ry);
   M5.Display.setTextSize(UI_TS_SM);
   M5.Display.setTextColor(TFT_CYAN, TFT_BLACK);
   M5.Display.setCursor(x, y); M5.Display.print(label);
   M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
-  M5.Display.setCursor(x + 56, y); M5.Display.print(value);
+  M5.Display.setCursor(x + sx(56), y); M5.Display.print(value);
 }
 
-void ddDrawTileFrame(int x, int y, int w, int h, const char* caption) {
+void ddDrawTileFrame(int rx, int ry, int rw, int rh, const char* caption) {
+  int x = sx(rx), y = sy(ry), w = sx(rw), h = sy(rh);
   M5.Display.drawRoundRect(x, y, w, h, 5, TFT_DARKGREY);
   M5.Display.setTextSize(UI_TS_SM);
   M5.Display.setTextColor(TFT_CYAN, TFT_BLACK);
-  M5.Display.setCursor(x + 6, y + 4); M5.Display.print(caption);
-  int clearY = y + 13;
+  M5.Display.setCursor(x + sx(6), y + sy(4)); M5.Display.print(caption);
+  int clearY = y + sy(13);
   M5.Display.fillRect(x + 1, clearY, w - 2, h - (clearY - y) - 2, TFT_BLACK);
 }
 
-void ddDrawSparkline(int x, int y, int w, int h,
+void ddDrawSparkline(int rx, int ry, int rw, int rh,
                      uint8_t* hist, int len, int head,
                      uint16_t color, bool clear = true) {
+  int x = sx(rx), y = sy(ry), w = sx(rw), h = sy(rh);
   if (clear) {
     M5.Display.fillRect(x, y, w, h, TFT_BLACK);
-    for (int gx = 0; gx < w; gx += 16) M5.Display.drawFastVLine(x + gx, y, h, TFT_DARKGREY);
-    for (int gy = 0; gy < h; gy += 10) M5.Display.drawFastHLine(x, y + gy, w, TFT_DARKGREY);
+    for (int gx = 0; gx < w; gx += sx(16)) M5.Display.drawFastVLine(x + gx, y, h, TFT_DARKGREY);
+    for (int gy = 0; gy < h; gy += sy(10)) M5.Display.drawFastHLine(x, y + gy, w, TFT_DARKGREY);
   }
 
   if (len < 2) return;
@@ -28325,7 +28330,7 @@ void ddDashboardInit(const char* ssid, const String& ip) {
 
   M5.Display.setTextSize(UI_TS_SM);
   M5.Display.setTextColor(TFT_CYAN, TFT_BLACK);
-  M5.Display.setCursor(6,   106); M5.Display.print("Clients");
+  M5.Display.setCursor(sx(6),   sy(106)); M5.Display.print("Clients");
   M5.Display.setCursor(sx(126), sy(106)); M5.Display.print("Throughput");
 
   // Clients graph
@@ -28336,12 +28341,14 @@ void ddDashboardInit(const char* ssid, const String& ip) {
 }
 
 
+// Receives already-scaled pixel coords (T_* macros use sx()/sy()); only the small
+// internal offsets are scaled here.
 inline void ddDrawValueInTile(int x, int y, int w, int h, const char* txt) {
-  int clearY = y + 13;
+  int clearY = y + sy(13);
   M5.Display.fillRect(x + 1, clearY, w - 2, h - (clearY - y) - 2, TFT_BLACK);
   M5.Display.setTextSize(UI_TS_SM);
   M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
-  M5.Display.setCursor(x + 6, y + h - 10); M5.Display.print(txt);
+  M5.Display.setCursor(x + sx(6), y + h - sy(10)); M5.Display.print(txt);
 }
 
 void ddUpdateTileClients(int v) {
