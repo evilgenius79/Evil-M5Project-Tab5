@@ -268,10 +268,14 @@ Tab5 platform.
 - Select the port and click Upload.
 
 ### Build with PlatformIO
-A ready [`platformio.ini`](./platformio.ini) is included (env `m5tab5`, using the
-**pioarduino** ESP32-P4 platform; it compiles only the Tab5 sketch and pins the
-library versions above). Build with `pio run -e m5tab5` and flash with
-`pio run -e m5tab5 -t upload` after entering download mode.
+A ready [`platformio.ini`](./platformio.ini) is included (using the **pioarduino**
+ESP32-P4 platform), with two environments:
+- **`m5tab5-full`** — the author's full port `Evil-M5Tab5.ino` (default).
+- **`m5tab5-core3`** — the leaner `Evil-Tab5-v1-0.ino`.
+
+Each env compiles only its own sketch and pins the required libraries. Build the
+full port with `pio run -e m5tab5-full` and flash with
+`pio run -e m5tab5-full -t upload` after entering download mode.
 
 > ⚠️ Tab5 support is new and hardware-dependent. The device is recognised
 > (`M5.getBoard() == board_M5Tab5`), the display/touch/SD paths are adapted, and the
